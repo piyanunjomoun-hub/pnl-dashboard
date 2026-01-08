@@ -9,10 +9,12 @@ from dateutil.relativedelta import relativedelta
 import gspread
 from google.oauth2.service_account import Credentials
 
+
 # -----------------------------
 # Page config
 # -----------------------------
-st.set_page_config(page_title="Production P&L", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Production P&L", page_icon="📊", remember=False, layout="wide")
+
 
 # =========================
 # Theme Toggle (Dark / Light)
@@ -26,84 +28,105 @@ with st.sidebar:
 
 DARK_CSS = """
 <style>
-.block-container { padding-top: 1.1rem; padding-bottom: 2rem; max-width: 1200px; }
+.block-container { padding-top: 1.0rem; padding-bottom: 2.2rem; max-width: 1200px; }
 .stApp { background-color:#0F172A; color:#E5E7EB; }
 [data-testid="stSidebar"] { background:#0B1220; }
 [data-testid="stSidebar"] * { color:#E5E7EB !important; }
 
-.card {
+.card{
   background:#111827;
   border:1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 14px 16px;
   box-shadow: 0 10px 22px rgba(0,0,0,0.35);
 }
-.card-title { font-size: 12px; letter-spacing: .06em; color: rgba(229,231,235,.70); font-weight: 800; text-transform: uppercase;}
-.card-value { font-size: 26px; font-weight: 900; margin-top: 4px; color:#E5E7EB; }
-.card-sub { font-size: 12px; color: rgba(229,231,235,.60); margin-top: 2px; }
-.small-muted { color: rgba(229,231,235,.65); font-size: 12px; }
-hr.soft { border: none; height: 1px; background: rgba(255,255,255,0.10); margin: 14px 0; }
-.sidebar-title { font-weight: 900; font-size: 16px; }
-.sidebar-sub { font-size: 12px; opacity: .75; margin-top: -6px; }
+.card-title{ font-size: 12px; letter-spacing:.06em; color: rgba(229,231,235,.70); font-weight: 800; text-transform: uppercase;}
+.card-value{ font-size: 26px; font-weight: 900; margin-top: 4px; color:#E5E7EB; }
+.card-sub{ font-size: 12px; color: rgba(229,231,235,.60); margin-top: 2px; }
 
-.topbar {
-  background:#111827;
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 14px 16px;
-  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
-}
+.small-muted{ color: rgba(229,231,235,.65); font-size: 12px; }
+hr.soft{ border:none; height:1px; background: rgba(255,255,255,0.10); margin:14px 0; }
 
-div[data-testid="stDataFrame"] {
+div[data-testid="stDataFrame"]{
   background:#0B1220;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.08);
 }
 
-.stButton > button { background:#2563EB; color:white; border-radius:10px; border:0; }
+/* Progress */
+.pb-wrap{ margin-top: 10px; }
+.pb-track{
+  width:100%;
+  height: 12px;
+  background: rgba(255,255,255,0.10);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pb-fill{
+  height: 12px;
+  width: var(--w);
+  background: linear-gradient(90deg, rgba(37,99,235,1), rgba(59,130,246,1));
+  border-radius: 999px;
+  box-shadow: 0 0 16px rgba(59,130,246,0.25);
+}
+.pb-meta{ display:flex; justify-content: space-between; margin-top:6px; }
+.pb-meta span{ font-size: 12px; color: rgba(229,231,235,.70); }
+
+.stButton > button{ background:#2563EB; color:white; border-radius:10px; border:0; }
 </style>
 """
 
 LIGHT_CSS = """
 <style>
-.block-container { padding-top: 1.1rem; padding-bottom: 2rem; max-width: 1200px; }
+.block-container { padding-top: 1.0rem; padding-bottom: 2.2rem; max-width: 1200px; }
 .stApp { background-color:#F8FAFC; color:#0F172A; }
 [data-testid="stSidebar"] { background:#FFFFFF; }
 
-.card {
+.card{
   background:#FFFFFF;
   border:1px solid rgba(15,23,42,0.08);
   border-radius: 16px;
   padding: 14px 16px;
   box-shadow: 0 6px 18px rgba(15,23,42,0.06);
 }
-.card-title { font-size: 12px; letter-spacing: .06em; color: rgba(15,23,42,.60); font-weight: 800; text-transform: uppercase;}
-.card-value { font-size: 26px; font-weight: 900; margin-top: 4px; }
-.card-sub { font-size: 12px; color: rgba(15,23,42,.55); margin-top: 2px; }
-.small-muted { color: rgba(15,23,42,.55); font-size: 12px; }
-hr.soft { border: none; height: 1px; background: rgba(15,23,42,0.08); margin: 14px 0; }
-.sidebar-title { font-weight: 900; font-size: 16px; }
-.sidebar-sub { font-size: 12px; opacity: .7; margin-top: -6px; }
+.card-title{ font-size: 12px; letter-spacing:.06em; color: rgba(15,23,42,.60); font-weight: 800; text-transform: uppercase;}
+.card-value{ font-size: 26px; font-weight: 900; margin-top: 4px; }
+.card-sub{ font-size: 12px; color: rgba(15,23,42,.55); margin-top: 2px; }
 
-.topbar {
-  background:#FFFFFF;
-  border:1px solid rgba(15,23,42,0.08);
-  border-radius: 16px;
-  padding: 14px 16px;
-  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
-}
+.small-muted{ color: rgba(15,23,42,.55); font-size: 12px; }
+hr.soft{ border:none; height:1px; background: rgba(15,23,42,0.08); margin:14px 0; }
 
-div[data-testid="stDataFrame"] {
+div[data-testid="stDataFrame"]{
   background:#FFFFFF;
   border-radius: 12px;
   border: 1px solid rgba(15,23,42,0.08);
 }
 
-.stButton > button { background:#2563EB; color:white; border-radius:10px; border:0; }
+/* Progress */
+.pb-wrap{ margin-top: 10px; }
+.pb-track{
+  width:100%;
+  height: 12px;
+  background: rgba(15,23,42,0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pb-fill{
+  height: 12px;
+  width: var(--w);
+  background: linear-gradient(90deg, rgba(37,99,235,1), rgba(59,130,246,1));
+  border-radius: 999px;
+  box-shadow: 0 0 16px rgba(59,130,246,0.18);
+}
+.pb-meta{ display:flex; justify-content: space-between; margin-top:6px; }
+.pb-meta span{ font-size: 12px; color: rgba(15,23,42,.60); }
+
+.stButton > button{ background:#2563EB; color:white; border-radius:10px; border:0; }
 </style>
 """
 
 st.markdown(DARK_CSS if st.session_state.theme == "dark" else LIGHT_CSS, unsafe_allow_html=True)
+
 
 # -----------------------------
 # Helpers
@@ -114,6 +137,7 @@ def money(x: float) -> str:
     except Exception:
         return "฿0"
 
+
 def calc_amount(qty, unit_price, vat_percent):
     qty = float(qty or 0)
     unit_price = float(unit_price or 0)
@@ -123,10 +147,54 @@ def calc_amount(qty, unit_price, vat_percent):
     net = base + vat
     return base, vat, net
 
-def month_range(month: date):
-    start = month.replace(day=1)
+
+def month_range(d: date):
+    start = d.replace(day=1)
     end = (start + relativedelta(months=1)) - relativedelta(days=1)
     return start, end
+
+
+def year_range(y: int):
+    return date(y, 1, 1), date(y, 12, 31)
+
+
+def progress_block(title: str, current: float, target: float, gap_label: str):
+    """
+    Render pretty progress bar with text.
+    """
+    if target <= 0:
+        st.markdown(f"""
+        <div class="card">
+          <div class="card-title">{title}</div>
+          <div class="card-value">{money(current)} / -</div>
+          <div class="card-sub">ตั้งเป้าหมายที่เมนู Achievement</div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    pct = (current / target) * 100.0
+    pct_clamped = max(0.0, min(pct, 100.0))
+    gap = max(target - current, 0.0)
+
+    st.markdown(f"""
+    <div class="card">
+      <div class="card-title">{title}</div>
+      <div class="card-value">{money(current)} / {money(target)}</div>
+      <div class="card-sub">{gap_label} {money(gap)} • ทำได้ {pct:.1f}%</div>
+
+      <div class="pb-wrap">
+        <div class="pb-track">
+          <div class="pb-fill" style="--w:{pct_clamped:.2f}%;"></div>
+        </div>
+        <div class="pb-meta">
+          <span>0%</span>
+          <span>{pct_clamped:.1f}%</span>
+          <span>100%</span>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # -----------------------------
 # Google Sheets connection
@@ -142,42 +210,50 @@ def get_gspread_client():
         st.error("Missing GCP_SERVICE_ACCOUNT in Secrets")
         st.stop()
 
-    if isinstance(raw, str):
-        raw = raw.strip()
-        if raw.startswith("'''") and raw.endswith("'''"):
-            raw = raw[3:-3].strip()
-
+    raw = raw.strip()
     info = json.loads(raw)
     creds = Credentials.from_service_account_info(info, scopes=scopes)
     return gspread.authorize(creds)
 
-def get_sheet():
+
+def get_worksheets():
     sheet_id = st.secrets.get("GSHEET_ID", "")
     if not sheet_id:
         st.error("Missing GSHEET_ID in Secrets")
         st.stop()
+
     gc = get_gspread_client()
     sh = gc.open_by_key(sheet_id)
-    return sh.worksheet("transactions")
 
-REQUIRED_HEADERS = [
+    tx_ws = sh.worksheet("transactions")
+    try:
+        ach_ws = sh.worksheet("achievement")
+    except Exception:
+        ach_ws = None
+    return sh, tx_ws, ach_ws
+
+
+TX_HEADERS = [
     "id","tx_date","project","tx_type","category","vendor","description",
     "qty","unit_price","vat_percent","payment","status","ref","created_at"
 ]
+ACH_HEADERS = ["year","month","target"]  # month 0 = yearly target row
 
-def ensure_headers(ws):
-    headers = ws.row_values(1)
-    if headers == REQUIRED_HEADERS:
+
+def ensure_headers(ws, headers):
+    existing = ws.row_values(1)
+    if existing == headers:
         return
-    if len(headers) == 0:
-        ws.append_row(REQUIRED_HEADERS)
+    if len(existing) == 0:
+        ws.append_row(headers)
         return
-    st.error("Header row ในชีท 'transactions' ไม่ตรงตามที่ต้องการ กรุณาตั้งหัวคอลัมน์ให้ตรงนี้")
-    st.code(",".join(REQUIRED_HEADERS))
+    st.error("Header row ในชีทไม่ตรงตามที่ต้องการ กรุณาตั้งหัวคอลัมน์ให้ตรงนี้")
+    st.code(",".join(headers))
     st.stop()
 
+
 def read_transactions(ws) -> pd.DataFrame:
-    ensure_headers(ws)
+    ensure_headers(ws, TX_HEADERS)
     records = ws.get_all_records()
     df = pd.DataFrame(records)
     if df.empty:
@@ -188,8 +264,10 @@ def read_transactions(ws) -> pd.DataFrame:
     df["id"] = pd.to_numeric(df["id"], errors="coerce").fillna(0).astype(int)
     return df
 
+
 def next_id(df: pd.DataFrame) -> int:
     return 1 if df.empty else int(df["id"].max()) + 1
+
 
 def append_transaction(ws, row: dict):
     values = [
@@ -200,22 +278,23 @@ def append_transaction(ws, row: dict):
     ]
     ws.append_row(values, value_input_option="USER_ENTERED")
 
-# -------- Delete helpers (by ID) --------
+
 def find_row_by_id(ws, target_id: int):
-    values = ws.get_all_values()  # includes header
+    values = ws.get_all_values()
     if len(values) <= 1:
         return None
-    for i in range(1, len(values)):  # start after header
+    for i in range(1, len(values)):
         row = values[i]
         if not row:
             continue
         try:
-            rid = int(str(row[0]).strip())  # col A = id
-        except:
+            rid = int(str(row[0]).strip())
+        except Exception:
             continue
         if rid == int(target_id):
-            return i + 1  # convert 0-based list index to sheet row number
+            return i + 1
     return None
+
 
 def delete_transaction_by_id(ws, target_id: int) -> bool:
     rownum = find_row_by_id(ws, target_id)
@@ -224,38 +303,76 @@ def delete_transaction_by_id(ws, target_id: int) -> bool:
     ws.delete_rows(rownum)
     return True
 
+
+# -----------------------------
+# Achievement
+# -----------------------------
+def read_achievement(ws) -> pd.DataFrame:
+    ensure_headers(ws, ACH_HEADERS)
+    rec = ws.get_all_records()
+    df = pd.DataFrame(rec)
+    if df.empty:
+        return df
+    df["year"] = pd.to_numeric(df["year"], errors="coerce").fillna(0).astype(int)
+    df["month"] = pd.to_numeric(df["month"], errors="coerce").fillna(0).astype(int)
+    df["target"] = pd.to_numeric(df["target"], errors="coerce").fillna(0.0)
+    return df
+
+
+def upsert_target(ws, year: int, month: int, target: float):
+    year = int(year)
+    month = int(month)
+    target = float(target)
+
+    values = ws.get_all_values()
+    if len(values) == 0:
+        ws.append_row(ACH_HEADERS)
+        values = ws.get_all_values()
+
+    for i in range(1, len(values)):
+        row = values[i]
+        if len(row) < 3:
+            continue
+        try:
+            y = int(str(row[0]).strip())
+            m = int(str(row[1]).strip())
+        except Exception:
+            continue
+        if y == year and m == month:
+            ws.update_cell(i + 1, 3, target)
+            return
+
+    ws.append_row([year, month, target], value_input_option="USER_ENTERED")
+
+
+def get_targets_for_year(ach_df: pd.DataFrame, year: int):
+    if ach_df.empty:
+        return 0.0, {m: 0.0 for m in range(1, 13)}
+
+    ydf = ach_df[ach_df["year"] == int(year)]
+    yearly = float(ydf[ydf["month"] == 0]["target"].max()) if not ydf[ydf["month"] == 0].empty else 0.0
+
+    monthly = {m: 0.0 for m in range(1, 13)}
+    mdf = ydf[(ydf["month"] >= 1) & (ydf["month"] <= 12)]
+    for _, r in mdf.iterrows():
+        monthly[int(r["month"])] = float(r["target"])
+    return yearly, monthly
+
+
 # -----------------------------
 # Sidebar nav
 # -----------------------------
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">Production P&L</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-sub">Google Sheets • No Auth</div>', unsafe_allow_html=True)
+    st.markdown("**Production P&L**")
+    st.caption("Google Sheets • No Login")
     st.markdown('<hr class="soft">', unsafe_allow_html=True)
-    nav = st.radio("", ["Dashboard", "Transactions", "Export"], index=0, label_visibility="collapsed")
+    nav = st.radio("", ["Dashboard", "Transactions", "Export", "Achievement"], index=0, label_visibility="collapsed")
     st.markdown('<hr class="soft">', unsafe_allow_html=True)
-    st.caption("ข้อมูลเก็บใน Google Sheets ✅")
+    st.caption("ต้องมีแท็บ: transactions, achievement")
+
 
 # -----------------------------
-# Top bar (like screenshot)
-# -----------------------------
-st.markdown(
-    f"""
-<div class="topbar">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <div>
-      <div style="font-weight:900; font-size:18px;">Production P&L Dashboard</div>
-      <div class="small-muted">No Login/Signup • Theme: <b>{st.session_state.theme.upper()}</b></div>
-    </div>
-    <div class="small-muted"><b>Ready</b></div>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-st.write("")
-
-# -----------------------------
-# Filter bar (month + search + sample)
+# Filter bar
 # -----------------------------
 c1, c2, c3 = st.columns([1.1, 1.6, 1.0], vertical_alignment="center")
 with c1:
@@ -265,38 +382,51 @@ with c2:
 with c3:
     add_sample = st.button("ใส่ข้อมูลตัวอย่าง", use_container_width=True)
 
-start, end = month_range(month_pick)
+start_m, end_m = month_range(month_pick)
+year_selected = month_pick.year
+start_y, end_y = year_range(year_selected)
+month_idx = month_pick.month
+
 
 # -----------------------------
 # Load from Google Sheets
 # -----------------------------
-ws = get_sheet()
-df_all = read_transactions(ws)
+sh, tx_ws, ach_ws = get_worksheets()
 
-# Add sample
+df_all = read_transactions(tx_ws)
+
 if add_sample:
     nid = next_id(df_all)
     demo = [
-        dict(id=nid, tx_date=start.isoformat(), project="Client A - TVC", tx_type="Income",
-             category="Production Fee", vendor="Client A", description="Shooting day rate / milestone",
-             qty=1, unit_price=8000, vat_percent=0, payment="Bank Transfer", status="Planned",
+        dict(id=nid, tx_date=start_m.isoformat(), project="Client A - TVC", tx_type="Income",
+             category="Production Fee", vendor="Client A", description="Milestone payment",
+             qty=1, unit_price=50000, vat_percent=0, payment="Bank Transfer", status="Received",
              ref="INV-001", created_at=datetime.now().isoformat()),
-        dict(id=nid+1, tx_date=start.isoformat(), project="Client A - TVC", tx_type="Expense",
+        dict(id=nid+1, tx_date=start_m.isoformat(), project="Client A - TVC", tx_type="Expense",
              category="Studio", vendor="Studio X", description="Studio rental",
              qty=1, unit_price=3500, vat_percent=7, payment="Bank Transfer", status="Paid",
              ref="RC-001", created_at=datetime.now().isoformat()),
     ]
     for r in demo:
-        append_transaction(ws, r)
+        append_transaction(tx_ws, r)
     st.success("ใส่ข้อมูลตัวอย่างแล้ว ✅")
     st.rerun()
 
-# Filter month + search
+
+def add_net_cols(dfin: pd.DataFrame) -> pd.DataFrame:
+    if dfin.empty:
+        return dfin
+    d = dfin.copy()
+    d["base"], d["vat"], d["net"] = zip(*d.apply(lambda r: calc_amount(r["qty"], r["unit_price"], r["vat_percent"]), axis=1))
+    return d
+
+
+# Month view
 if df_all.empty:
     df = df_all
 else:
     df = df_all.copy()
-    df = df[(df["tx_date"].dt.date >= start) & (df["tx_date"].dt.date <= end)]
+    df = df[(df["tx_date"].dt.date >= start_m) & (df["tx_date"].dt.date <= end_m)]
     if search.strip():
         s = search.strip().lower()
         def match_row(r):
@@ -310,32 +440,56 @@ else:
             return s in blob
         df = df[df.apply(match_row, axis=1)]
 
-# Compute totals
-if df.empty:
-    total_income = total_expense = profit = margin = 0.0
+df = add_net_cols(df)
+
+# Year view (Jan-Dec)
+if df_all.empty:
+    df_year = df_all
 else:
-    df["base"], df["vat"], df["net"] = zip(*df.apply(lambda r: calc_amount(r["qty"], r["unit_price"], r["vat_percent"]), axis=1))
-    income_df = df[df["tx_type"] == "Income"]
-    expense_df = df[df["tx_type"] == "Expense"]
-    total_income = float(income_df["net"].sum())
-    total_expense = float(expense_df["net"].sum())
-    profit = total_income - total_expense
-    margin = (profit / total_income * 100.0) if total_income > 0 else 0.0
+    df_year = df_all.copy()
+    df_year = df_year[(df_year["tx_date"].dt.date >= start_y) & (df_year["tx_date"].dt.date <= end_y)]
+
+df_year = add_net_cols(df_year)
+
+# Sales (Income only)
+sales_month = float(df[df["tx_type"] == "Income"]["net"].sum()) if not df.empty else 0.0
+sales_ytd = float(df_year[df_year["tx_type"] == "Income"]["net"].sum()) if not df_year.empty else 0.0
+
+# P&L month
+total_income = sales_month
+total_expense = float(df[df["tx_type"] == "Expense"]["net"].sum()) if not df.empty else 0.0
+profit = total_income - total_expense
+margin = (profit / total_income * 100.0) if total_income > 0 else 0.0
+
+
+# -----------------------------
+# Targets
+# -----------------------------
+annual_target = 0.0
+monthly_targets = {m: 0.0 for m in range(1, 13)}
+
+if ach_ws is not None:
+    ach_df = read_achievement(ach_ws)
+    annual_target, monthly_targets = get_targets_for_year(ach_df, year_selected)
+
+default_monthly_target = (annual_target / 12.0) if annual_target > 0 else 0.0
+monthly_target = monthly_targets.get(month_idx, 0.0) or default_monthly_target
 
 # -----------------------------
 # Pages
 # -----------------------------
 if nav == "Dashboard":
     st.markdown("### Dashboard")
-    st.caption("ภาพรวมรายเดือน + บันทึกรายการ (Google Sheets)")
+    st.caption("ภาพรวมรายเดือน + กราฟรายเดือนทั้งปี + Achievement")
 
+    # KPI cards
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
         <div class="card">
-          <div class="card-title">TOTAL INCOME</div>
+          <div class="card-title">TOTAL INCOME (SALES)</div>
           <div class="card-value">{money(total_income)}</div>
-          <div class="card-sub">รายรับรวม (เดือนที่เลือก)</div>
+          <div class="card-sub">ยอดขายเดือนนี้</div>
         </div>
         """, unsafe_allow_html=True)
     with k2:
@@ -343,7 +497,7 @@ if nav == "Dashboard":
         <div class="card">
           <div class="card-title">TOTAL EXPENSE</div>
           <div class="card-value">{money(total_expense)}</div>
-          <div class="card-sub">รายจ่ายรวม (เดือนที่เลือก)</div>
+          <div class="card-sub">รายจ่ายเดือนนี้</div>
         </div>
         """, unsafe_allow_html=True)
     with k3:
@@ -351,7 +505,7 @@ if nav == "Dashboard":
         <div class="card">
           <div class="card-title">PROFIT / LOSS</div>
           <div class="card-value">{money(profit)}</div>
-          <div class="card-sub">กำไร/ขาดทุน</div>
+          <div class="card-sub">กำไร/ขาดทุนเดือนนี้</div>
         </div>
         """, unsafe_allow_html=True)
     with k4:
@@ -364,39 +518,65 @@ if nav == "Dashboard":
         """, unsafe_allow_html=True)
 
     st.write("")
+
+    # Progress blocks (MONTH / YEAR)
+    a1, a2 = st.columns(2)
+    with a1:
+        progress_block(
+            title="ACHIEVEMENT (MONTH)",
+            current=sales_month,
+            target=monthly_target,
+            gap_label="ยังขาด"
+        )
+    with a2:
+        progress_block(
+            title="ACHIEVEMENT (YEAR)",
+            current=sales_ytd,
+            target=annual_target,
+            gap_label="ยังขาด"
+        )
+
+    st.write("")
+
+    # Chart: Jan-Dec (Income & Expense)
     left, right = st.columns([2.1, 1.2])
 
     with left:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("**Monthly Chart** <span class='small-muted' style='float:right'>Income / Expense / Profit</span>",
+        st.markdown("**Monthly Chart (Jan–Dec)** <span class='small-muted' style='float:right'>Sales vs Expense</span>",
                     unsafe_allow_html=True)
-        if df.empty:
-            st.info("ยังไม่มีข้อมูลในเดือนนี้")
+
+        if df_year.empty:
+            st.info("ยังไม่มีข้อมูลในปีนี้")
         else:
-            d = df.copy()
-            d["day"] = d["tx_date"].dt.date.astype(str)
-            daily = (
-                d.groupby(["day","tx_type"], as_index=False)["net"].sum()
-                .pivot(index="day", columns="tx_type", values="net")
-                .fillna(0.0)
-                .reset_index()
-            )
-            if "Income" not in daily.columns: daily["Income"] = 0.0
-            if "Expense" not in daily.columns: daily["Expense"] = 0.0
-            daily["Profit"] = daily["Income"] - daily["Expense"]
-            melt = daily.melt("day", var_name="metric", value_name="value")
+            d = df_year.copy()
+            d["month"] = d["tx_date"].dt.month
+            d = d.groupby(["month","tx_type"], as_index=False)["net"].sum()
+
+            months = pd.DataFrame({"month": list(range(1, 13))})
+            inc = d[d["tx_type"] == "Income"][["month","net"]].rename(columns={"net":"Income"})
+            exp = d[d["tx_type"] == "Expense"][["month","net"]].rename(columns={"net":"Expense"})
+            m = months.merge(inc, on="month", how="left").merge(exp, on="month", how="left").fillna(0.0)
+
+            month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+            m["month_name"] = m["month"].apply(lambda x: month_labels[int(x)-1])
+
+            melt = m.melt(id_vars=["month","month_name"], value_vars=["Income","Expense"],
+                          var_name="metric", value_name="value")
+
             chart = (
                 alt.Chart(melt)
                 .mark_line(point=True)
                 .encode(
-                    x=alt.X("day:N", title=""),
+                    x=alt.X("month_name:N", sort=month_labels, title=""),
                     y=alt.Y("value:Q", title=""),
                     color=alt.Color("metric:N", title=""),
-                    tooltip=["day","metric", alt.Tooltip("value:Q", format=",.0f")]
+                    tooltip=["month_name","metric", alt.Tooltip("value:Q", format=",.0f")]
                 )
-                .properties(height=280)
+                .properties(height=260)
             )
             st.altair_chart(chart, use_container_width=True)
+
         st.markdown("</div>", unsafe_allow_html=True)
 
     with right:
@@ -415,6 +595,8 @@ if nav == "Dashboard":
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.write("")
+
+    # Add Transaction
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("**Add Transaction**")
 
@@ -476,13 +658,12 @@ if nav == "Dashboard":
                 ref=ref.strip(),
                 created_at=datetime.now().isoformat(),
             )
-            append_transaction(ws, row)
+            append_transaction(tx_ws, row)
             st.success("เพิ่มรายการแล้ว ✅")
             st.rerun()
 
     st.write("")
     st.markdown("**Transactions**")
-
     if df.empty:
         st.caption("0 rows")
     else:
@@ -508,14 +689,13 @@ if nav == "Dashboard":
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-if nav == "Transactions":
+elif nav == "Transactions":
     st.markdown("### Transactions")
     st.caption("ดูรายการตามเดือน + ค้นหา และลบรายการที่กรอกผิด (Google Sheets)")
 
     if df.empty:
         st.info("ไม่มีรายการในช่วงที่เลือก")
     else:
-        # Delete block
         st.markdown("#### Delete Transaction")
         id_list = df["id"].astype(int).sort_values(ascending=False).tolist()
 
@@ -525,19 +705,16 @@ if nav == "Transactions":
         with colB:
             confirm = st.checkbox("ยืนยันว่าต้องการลบ", value=False)
         with colC:
-            st.caption("ลบแล้วกู้คืนไม่ได้ทันที แต่สามารถย้อนจาก Version history ของ Google Sheets ได้")
+            st.caption("ลบแล้วกู้คืนไม่ได้ทันที แต่ย้อนจาก Version history ของ Google Sheets ได้")
 
         preview = df[df["id"].astype(int) == int(selected_id)].head(1)
         if not preview.empty:
             p = preview.iloc[0]
-            base, vat, net = calc_amount(p.get("qty"), p.get("unit_price"), p.get("vat_percent"))
-            st.write(
-                f"กำลังจะลบ: **{p.get('tx_date').date()} | {p.get('tx_type')} | {p.get('project','')} | "
-                f"{p.get('category','')} | {p.get('vendor','')} | Net {money(net)}**"
-            )
+            _, _, net = calc_amount(p.get("qty"), p.get("unit_price"), p.get("vat_percent"))
+            st.write(f"กำลังจะลบ: **{p.get('tx_date').date()} | {p.get('tx_type')} | {p.get('project','')} | Net {money(net)}**")
 
         if st.button("🗑️ Delete Selected Transaction", type="primary", disabled=not confirm):
-            ok = delete_transaction_by_id(ws, int(selected_id))
+            ok = delete_transaction_by_id(tx_ws, int(selected_id))
             if ok:
                 st.success(f"ลบรายการ ID={selected_id} เรียบร้อย ✅")
                 st.rerun()
@@ -551,9 +728,9 @@ if nav == "Transactions":
         st.dataframe(out, use_container_width=True, hide_index=True)
 
 
-if nav == "Export":
+elif nav == "Export":
     st.markdown("### Export")
-    st.caption("ดาวน์โหลด CSV ตามเดือน/การค้นหา (Google Sheets)")
+    st.caption("ดาวน์โหลด CSV ตามเดือน/การค้นหา")
 
     if df.empty:
         st.warning("ไม่มีข้อมูลให้ Export")
@@ -568,3 +745,66 @@ if nav == "Export":
             mime="text/csv",
             use_container_width=True
         )
+
+
+elif nav == "Achievement":
+    st.markdown("### Achievement")
+    st.caption("ตั้งเป้าหมายยอดขายรายปี และ (ถ้าต้องการ) override เป้ารายเดือน")
+
+    if ach_ws is None:
+        st.error("ยังไม่มีแท็บชื่อ `achievement` ใน Google Sheets")
+        st.info("ไปที่ Google Sheets → เพิ่ม Sheet ใหม่ → ตั้งชื่อแท็บว่า `achievement` แล้วกลับมารีเฟรชหน้านี้")
+        st.stop()
+
+    ensure_headers(ach_ws, ACH_HEADERS)
+    ach_df = read_achievement(ach_ws)
+
+    year_input = st.number_input("เลือกปีที่ต้องการตั้งเป้า", min_value=2000, max_value=2100, value=int(year_selected), step=1)
+
+    annual, monthly_map = get_targets_for_year(ach_df, int(year_input))
+
+    st.markdown("#### เป้าหมายรายปี")
+    col1, col2 = st.columns([1.2, 1.0], vertical_alignment="center")
+    with col1:
+        annual_new = st.number_input("ตั้งเป้ายอดขายทั้งปี (บาท)", min_value=0.0, value=float(annual), step=10000.0)
+    with col2:
+        st.caption("ถ้าตั้งรายปี = ระบบเฉลี่ยต่อเดือนอัตโนมัติ (รายปี / 12)")
+        save_year = st.button("บันทึกเป้ารายปี", use_container_width=True)
+
+    if save_year:
+        upsert_target(ach_ws, int(year_input), 0, float(annual_new))
+        st.success("บันทึกเป้ารายปีแล้ว ✅")
+        st.rerun()
+
+    st.markdown("#### เป้าหมายรายเดือน (Optional)")
+    st.caption("ถ้าใส่ 0 = ใช้ค่าเฉลี่ยจากรายปีแทน")
+
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    rows = []
+    for m in range(1, 13):
+        rows.append({"month": m, "month_name": months[m-1], "target": float(monthly_map.get(m, 0.0))})
+
+    editor_df = pd.DataFrame(rows)
+    edited = st.data_editor(
+        editor_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "month": st.column_config.NumberColumn("Month", disabled=True),
+            "month_name": st.column_config.TextColumn("Name", disabled=True),
+            "target": st.column_config.NumberColumn("Monthly Target (บาท)", min_value=0.0, step=1000.0),
+        }
+    )
+
+    if st.button("บันทึกเป้ารายเดือน", type="primary", use_container_width=True):
+        for _, r in edited.iterrows():
+            m = int(r["month"])
+            t = float(r["target"] or 0.0)
+            upsert_target(ach_ws, int(year_input), m, t)
+        st.success("บันทึกเป้ารายเดือนแล้ว ✅")
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("#### ตัวอย่างตามโจทย์")
+    st.write(f"- ถ้าตั้งเป้ารายปี {money(10_000_000)} → ค่าเฉลี่ยต่อเดือน {money(10_000_000/12)}")
+    st.write("- Dashboard จะแสดงยอดเดือนนี้ / เป้ารายเดือน + ยังขาดอีกเท่าไหร่ + % พร้อม progress bar")
