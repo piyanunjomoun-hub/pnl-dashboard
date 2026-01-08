@@ -16,70 +16,9 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="Production P&L", page_icon="📊", layout="wide")
 
 
-# =========================
-# Theme Toggle (Dark / Light)
-# =========================
-if "theme" not in st.session_state:
-    st.session_state.theme = "dark"
-
-with st.sidebar:
-    is_dark = st.toggle("🌙 Dark mode", value=(st.session_state.theme == "dark"))
-    st.session_state.theme = "dark" if is_dark else "light"
-
-DARK_CSS = """
-<style>
-header[data-testid="stHeader"] { display: none; }
-div[data-testid="stToolbar"] { display: none; }
-
-.block-container { padding-top: 0.8rem; padding-bottom: 2.2rem; max-width: 1200px; }
-
-.stApp { background-color:#0F172A; color:#E5E7EB; }
-[data-testid="stSidebar"] { background:#0B1220; }
-[data-testid="stSidebar"] * { color:#E5E7EB !important; }
-
-.card{
-  background:#111827;
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 14px 16px;
-  box-shadow: 0 10px 22px rgba(0,0,0,0.35);
-}
-.card-title{ font-size: 12px; letter-spacing:.06em; color: rgba(229,231,235,.70); font-weight: 800; text-transform: uppercase;}
-.card-value{ font-size: 26px; font-weight: 900; margin-top: 4px; color:#E5E7EB; }
-.card-sub{ font-size: 12px; color: rgba(229,231,235,.60); margin-top: 2px; }
-
-.small-muted{ color: rgba(229,231,235,.65); font-size: 12px; }
-hr.soft{ border:none; height:1px; background: rgba(255,255,255,0.10); margin:14px 0; }
-
-div[data-testid="stDataFrame"]{
-  background:#0B1220;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-/* Progress */
-.pb-wrap{ margin-top: 10px; }
-.pb-track{
-  width:100%;
-  height: 12px;
-  background: rgba(255,255,255,0.10);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.pb-fill{
-  height: 12px;
-  width: var(--w);
-  background: linear-gradient(90deg, rgba(37,99,235,1), rgba(59,130,246,1));
-  border-radius: 999px;
-  box-shadow: 0 0 16px rgba(59,130,246,0.25);
-}
-.pb-meta{ display:flex; justify-content: space-between; margin-top:6px; }
-.pb-meta span{ font-size: 12px; color: rgba(229,231,235,.70); }
-
-.stButton > button{ background:#2563EB; color:white; border-radius:10px; border:0; }
-</style>
-"""
-
+# -----------------------------
+# Light UI CSS (No Dark mode)
+# -----------------------------
 LIGHT_CSS = """
 <style>
 header[data-testid="stHeader"] { display: none; }
@@ -132,8 +71,7 @@ div[data-testid="stDataFrame"]{
 .stButton > button{ background:#2563EB; color:white; border-radius:10px; border:0; }
 </style>
 """
-
-st.markdown(DARK_CSS if st.session_state.theme == "dark" else LIGHT_CSS, unsafe_allow_html=True)
+st.markdown(LIGHT_CSS, unsafe_allow_html=True)
 
 
 # -----------------------------
@@ -433,7 +371,7 @@ month_idx = month_pick.month
 # -----------------------------
 # Load from Google Sheets
 # -----------------------------
-sh, tx_ws, ach_ws = get_worksheets()
+_, tx_ws, ach_ws = get_worksheets()
 df_all = read_transactions(tx_ws)
 
 if add_sample:
@@ -488,7 +426,7 @@ def add_net_cols(dfin: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
-# Month view (filtered)
+# Month view
 if df_all.empty:
     df = df_all
 else:
@@ -603,7 +541,7 @@ if nav == "Dashboard":
 
     st.write("")
 
-    # Progress blocks (MONTH / YEAR)
+    # Achievement progress blocks
     a1, a2 = st.columns(2)
     with a1:
         progress_block("ACHIEVEMENT (MONTH)", sales_month, monthly_target, "ยังขาด")
@@ -612,7 +550,7 @@ if nav == "Dashboard":
 
     st.write("")
 
-    # Chart: Jan-Dec (Income & Expense)
+    # Chart + Quick export
     left, right = st.columns([2.1, 1.2])
 
     with left:
