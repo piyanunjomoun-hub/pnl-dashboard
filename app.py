@@ -159,9 +159,6 @@ def year_range(y: int):
 
 
 def progress_block(title: str, current: float, target: float, gap_label: str):
-    """
-    Render pretty progress bar with text.
-    """
     if target <= 0:
         st.markdown(f"""
         <div class="card">
@@ -196,9 +193,6 @@ def progress_block(title: str, current: float, target: float, gap_label: str):
     """, unsafe_allow_html=True)
 
 
-# -----------------------------
-# Google Sheets connection
-# -----------------------------
 @st.cache_resource
 def get_gspread_client():
     scopes = [
@@ -210,8 +204,7 @@ def get_gspread_client():
         st.error("Missing GCP_SERVICE_ACCOUNT in Secrets")
         st.stop()
 
-    raw = raw.strip()
-    info = json.loads(raw)
+    info = json.loads(raw.strip())
     creds = Credentials.from_service_account_info(info, scopes=scopes)
     return gspread.authorize(creds)
 
@@ -230,6 +223,7 @@ def get_worksheets():
         ach_ws = sh.worksheet("achievement")
     except Exception:
         ach_ws = None
+
     return sh, tx_ws, ach_ws
 
 
@@ -237,7 +231,7 @@ TX_HEADERS = [
     "id","tx_date","project","tx_type","category","vendor","description",
     "qty","unit_price","vat_percent","payment","status","ref","created_at"
 ]
-ACH_HEADERS = ["year","month","target"]  # month 0 = yearly target row
+ACH_HEADERS = ["year","month","target"]
 
 
 def ensure_headers(ws, headers):
@@ -304,9 +298,6 @@ def delete_transaction_by_id(ws, target_id: int) -> bool:
     return True
 
 
-# -----------------------------
-# Achievement
-# -----------------------------
 def read_achievement(ws) -> pd.DataFrame:
     ensure_headers(ws, ACH_HEADERS)
     rec = ws.get_all_records()
@@ -320,9 +311,7 @@ def read_achievement(ws) -> pd.DataFrame:
 
 
 def upsert_target(ws, year: int, month: int, target: float):
-    year = int(year)
-    month = int(month)
-    target = float(target)
+    year, month, target = int(year), int(month), float(target)
 
     values = ws.get_all_values()
     if len(values) == 0:
@@ -341,7 +330,6 @@ def upsert_target(ws, year: int, month: int, target: float):
         if y == year and m == month:
             ws.update_cell(i + 1, 3, target)
             return
-
     ws.append_row([year, month, target], value_input_option="USER_ENTERED")
 
 
@@ -389,10 +377,9 @@ month_idx = month_pick.month
 
 
 # -----------------------------
-# Load from Google Sheets
+# Load Sheets
 # -----------------------------
 sh, tx_ws, ach_ws = get_worksheets()
-
 df_all = read_transactions(tx_ws)
 
 if add_sample:
@@ -442,7 +429,7 @@ else:
 
 df = add_net_cols(df)
 
-# Year view (Jan-Dec)
+# Year view
 if df_all.empty:
     df_year = df_all
 else:
@@ -451,29 +438,26 @@ else:
 
 df_year = add_net_cols(df_year)
 
-# Sales (Income only)
+# Sales
 sales_month = float(df[df["tx_type"] == "Income"]["net"].sum()) if not df.empty else 0.0
 sales_ytd = float(df_year[df_year["tx_type"] == "Income"]["net"].sum()) if not df_year.empty else 0.0
 
-# P&L month
+# P&L (month)
 total_income = sales_month
 total_expense = float(df[df["tx_type"] == "Expense"]["net"].sum()) if not df.empty else 0.0
 profit = total_income - total_expense
 margin = (profit / total_income * 100.0) if total_income > 0 else 0.0
 
-
-# -----------------------------
 # Targets
-# -----------------------------
 annual_target = 0.0
 monthly_targets = {m: 0.0 for m in range(1, 13)}
-
 if ach_ws is not None:
     ach_df = read_achievement(ach_ws)
     annual_target, monthly_targets = get_targets_for_year(ach_df, year_selected)
 
 default_monthly_target = (annual_target / 12.0) if annual_target > 0 else 0.0
 monthly_target = monthly_targets.get(month_idx, 0.0) or default_monthly_target
+
 
 # -----------------------------
 # Pages
@@ -482,7 +466,6 @@ if nav == "Dashboard":
     st.markdown("### Dashboard")
     st.caption("ภาพรวมรายเดือน + กราฟรายเดือนทั้งปี + Achievement")
 
-    # KPI cards
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
@@ -496,315 +479,4 @@ if nav == "Dashboard":
         st.markdown(f"""
         <div class="card">
           <div class="card-title">TOTAL EXPENSE</div>
-          <div class="card-value">{money(total_expense)}</div>
-          <div class="card-sub">รายจ่ายเดือนนี้</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with k3:
-        st.markdown(f"""
-        <div class="card">
-          <div class="card-title">PROFIT / LOSS</div>
-          <div class="card-value">{money(profit)}</div>
-          <div class="card-sub">กำไร/ขาดทุนเดือนนี้</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with k4:
-        st.markdown(f"""
-        <div class="card">
-          <div class="card-title">PROFIT MARGIN</div>
-          <div class="card-value">{margin:.0f}%</div>
-          <div class="card-sub">Profit / Income</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.write("")
-
-    # Progress blocks (MONTH / YEAR)
-    a1, a2 = st.columns(2)
-    with a1:
-        progress_block(
-            title="ACHIEVEMENT (MONTH)",
-            current=sales_month,
-            target=monthly_target,
-            gap_label="ยังขาด"
-        )
-    with a2:
-        progress_block(
-            title="ACHIEVEMENT (YEAR)",
-            current=sales_ytd,
-            target=annual_target,
-            gap_label="ยังขาด"
-        )
-
-    st.write("")
-
-    # Chart: Jan-Dec (Income & Expense)
-    left, right = st.columns([2.1, 1.2])
-
-    with left:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("**Monthly Chart (Jan–Dec)** <span class='small-muted' style='float:right'>Sales vs Expense</span>",
-                    unsafe_allow_html=True)
-
-        if df_year.empty:
-            st.info("ยังไม่มีข้อมูลในปีนี้")
-        else:
-            d = df_year.copy()
-            d["month"] = d["tx_date"].dt.month
-            d = d.groupby(["month","tx_type"], as_index=False)["net"].sum()
-
-            months = pd.DataFrame({"month": list(range(1, 13))})
-            inc = d[d["tx_type"] == "Income"][["month","net"]].rename(columns={"net":"Income"})
-            exp = d[d["tx_type"] == "Expense"][["month","net"]].rename(columns={"net":"Expense"})
-            m = months.merge(inc, on="month", how="left").merge(exp, on="month", how="left").fillna(0.0)
-
-            month_labels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-            m["month_name"] = m["month"].apply(lambda x: month_labels[int(x)-1])
-
-            melt = m.melt(id_vars=["month","month_name"], value_vars=["Income","Expense"],
-                          var_name="metric", value_name="value")
-
-            chart = (
-                alt.Chart(melt)
-                .mark_line(point=True)
-                .encode(
-                    x=alt.X("month_name:N", sort=month_labels, title=""),
-                    y=alt.Y("value:Q", title=""),
-                    color=alt.Color("metric:N", title=""),
-                    tooltip=["month_name","metric", alt.Tooltip("value:Q", format=",.0f")]
-                )
-                .properties(height=260)
-            )
-            st.altair_chart(chart, use_container_width=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with right:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("**Quick Export** <span class='small-muted' style='float:right'>CSV</span>", unsafe_allow_html=True)
-        st.write("ดาวน์โหลดรายการที่กรองด้วย “เดือน + ค้นหา”")
-        if df.empty:
-            st.button("Download CSV", use_container_width=True, disabled=True)
-        else:
-            out = df.copy()
-            out["tx_date"] = out["tx_date"].dt.date.astype(str)
-            csv_bytes = out.to_csv(index=False).encode("utf-8-sig")
-            st.download_button("Download CSV", data=csv_bytes, file_name="transactions_export.csv",
-                               mime="text/csv", use_container_width=True)
-        st.caption("*เหมาะส่งให้บัญชี หรือทำ Pivot ต่อใน Excel")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.write("")
-
-    # Add Transaction
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("**Add Transaction**")
-
-    category_presets = ["Production Fee", "Studio", "Crew", "Equipment", "Post-Production", "Travel", "Ads", "Other"]
-    payment_presets = ["Bank Transfer", "Cash", "Credit", "Other"]
-    status_presets = ["Planned", "Paid", "Invoiced", "Received", "Other"]
-
-    with st.form("add_tx", clear_on_submit=True):
-        r1 = st.columns([1.1, 1.6, 1.0, 1.3, 1.3])
-        with r1[0]:
-            d = st.date_input("วันที่", value=date.today())
-        with r1[1]:
-            project = st.text_input("Project / Client", value="", placeholder="Client A - TVC")
-        with r1[2]:
-            tx_type = st.selectbox("ประเภท", ["Income", "Expense"])
-        with r1[3]:
-            category = st.selectbox("หมวดหมู่", category_presets)
-        with r1[4]:
-            vendor = st.text_input("Vendor/Payee", value="", placeholder="Studio / Freelance / Supplier")
-
-        r2 = st.columns([2.2, 0.9, 1.1, 1.0, 1.2])
-        with r2[0]:
-            desc = st.text_input("คำอธิบาย", value="", placeholder="Milestone / Equipment rent / Crew fee")
-        with r2[1]:
-            qty = st.number_input("Qty", min_value=0.0, value=1.0, step=1.0)
-        with r2[2]:
-            unit_price = st.number_input("Unit Price", min_value=0.0, value=0.0, step=100.0)
-        with r2[3]:
-            vat_percent = st.number_input("VAT %", min_value=0.0, max_value=20.0, value=0.0, step=1.0)
-        with r2[4]:
-            pay = st.selectbox("Payment", payment_presets)
-
-        r3 = st.columns([1.1, 1.4, 1.5, 1.0])
-        with r3[0]:
-            status = st.selectbox("Status", status_presets)
-        with r3[1]:
-            ref = st.text_input("Ref No.", value="", placeholder="INV-001 / RC-001")
-        with r3[2]:
-            base, vat, net = calc_amount(qty, unit_price, vat_percent)
-            st.text_input("Net", value=f"{net:,.0f}", disabled=True)
-        with r3[3]:
-            submitted = st.form_submit_button("เพิ่มรายการ", type="primary", use_container_width=True)
-
-        if submitted:
-            nid = next_id(df_all)
-            row = dict(
-                id=nid,
-                tx_date=d.isoformat(),
-                project=project.strip(),
-                tx_type=tx_type,
-                category=category,
-                vendor=vendor.strip(),
-                description=desc.strip(),
-                qty=float(qty),
-                unit_price=float(unit_price),
-                vat_percent=float(vat_percent),
-                payment=pay,
-                status=status,
-                ref=ref.strip(),
-                created_at=datetime.now().isoformat(),
-            )
-            append_transaction(tx_ws, row)
-            st.success("เพิ่มรายการแล้ว ✅")
-            st.rerun()
-
-    st.write("")
-    st.markdown("**Transactions**")
-    if df.empty:
-        st.caption("0 rows")
-    else:
-        show = df.copy()
-        show["Date"] = show["tx_date"].dt.date.astype(str)
-        show["Amount"] = show["base"].round(0).astype(int)
-        show["VAT"] = show["vat"].round(0).astype(int)
-        show["Net"] = show["net"].round(0).astype(int)
-        show = show.rename(columns={
-            "project":"Project",
-            "tx_type":"Type",
-            "category":"Category",
-            "vendor":"Vendor",
-            "description":"Description",
-            "qty":"Qty",
-            "unit_price":"Unit",
-            "status":"Status",
-            "ref":"Ref",
-        })
-        cols = ["id","Date","Project","Type","Category","Vendor","Description","Qty","Unit","Amount","VAT","Net","Status","Ref"]
-        st.dataframe(show[cols], use_container_width=True, hide_index=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-elif nav == "Transactions":
-    st.markdown("### Transactions")
-    st.caption("ดูรายการตามเดือน + ค้นหา และลบรายการที่กรอกผิด (Google Sheets)")
-
-    if df.empty:
-        st.info("ไม่มีรายการในช่วงที่เลือก")
-    else:
-        st.markdown("#### Delete Transaction")
-        id_list = df["id"].astype(int).sort_values(ascending=False).tolist()
-
-        colA, colB, colC = st.columns([1.2, 1.2, 2.6], vertical_alignment="center")
-        with colA:
-            selected_id = st.selectbox("เลือก ID ที่ต้องการลบ", id_list)
-        with colB:
-            confirm = st.checkbox("ยืนยันว่าต้องการลบ", value=False)
-        with colC:
-            st.caption("ลบแล้วกู้คืนไม่ได้ทันที แต่ย้อนจาก Version history ของ Google Sheets ได้")
-
-        preview = df[df["id"].astype(int) == int(selected_id)].head(1)
-        if not preview.empty:
-            p = preview.iloc[0]
-            _, _, net = calc_amount(p.get("qty"), p.get("unit_price"), p.get("vat_percent"))
-            st.write(f"กำลังจะลบ: **{p.get('tx_date').date()} | {p.get('tx_type')} | {p.get('project','')} | Net {money(net)}**")
-
-        if st.button("🗑️ Delete Selected Transaction", type="primary", disabled=not confirm):
-            ok = delete_transaction_by_id(tx_ws, int(selected_id))
-            if ok:
-                st.success(f"ลบรายการ ID={selected_id} เรียบร้อย ✅")
-                st.rerun()
-            else:
-                st.error("ไม่พบรายการนี้ในชีท (อาจถูกลบไปแล้ว)")
-
-        st.markdown("---")
-        out = df.copy()
-        out["tx_date"] = out["tx_date"].dt.date.astype(str)
-        out = out.sort_values(["tx_date","id"], ascending=[False, False])
-        st.dataframe(out, use_container_width=True, hide_index=True)
-
-
-elif nav == "Export":
-    st.markdown("### Export")
-    st.caption("ดาวน์โหลด CSV ตามเดือน/การค้นหา")
-
-    if df.empty:
-        st.warning("ไม่มีข้อมูลให้ Export")
-    else:
-        out = df.copy()
-        out["tx_date"] = out["tx_date"].dt.date.astype(str)
-        csv_bytes = out.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "Download CSV",
-            data=csv_bytes,
-            file_name="transactions_export.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-
-
-elif nav == "Achievement":
-    st.markdown("### Achievement")
-    st.caption("ตั้งเป้าหมายยอดขายรายปี และ (ถ้าต้องการ) override เป้ารายเดือน")
-
-    if ach_ws is None:
-        st.error("ยังไม่มีแท็บชื่อ `achievement` ใน Google Sheets")
-        st.info("ไปที่ Google Sheets → เพิ่ม Sheet ใหม่ → ตั้งชื่อแท็บว่า `achievement` แล้วกลับมารีเฟรชหน้านี้")
-        st.stop()
-
-    ensure_headers(ach_ws, ACH_HEADERS)
-    ach_df = read_achievement(ach_ws)
-
-    year_input = st.number_input("เลือกปีที่ต้องการตั้งเป้า", min_value=2000, max_value=2100, value=int(year_selected), step=1)
-
-    annual, monthly_map = get_targets_for_year(ach_df, int(year_input))
-
-    st.markdown("#### เป้าหมายรายปี")
-    col1, col2 = st.columns([1.2, 1.0], vertical_alignment="center")
-    with col1:
-        annual_new = st.number_input("ตั้งเป้ายอดขายทั้งปี (บาท)", min_value=0.0, value=float(annual), step=10000.0)
-    with col2:
-        st.caption("ถ้าตั้งรายปี = ระบบเฉลี่ยต่อเดือนอัตโนมัติ (รายปี / 12)")
-        save_year = st.button("บันทึกเป้ารายปี", use_container_width=True)
-
-    if save_year:
-        upsert_target(ach_ws, int(year_input), 0, float(annual_new))
-        st.success("บันทึกเป้ารายปีแล้ว ✅")
-        st.rerun()
-
-    st.markdown("#### เป้าหมายรายเดือน (Optional)")
-    st.caption("ถ้าใส่ 0 = ใช้ค่าเฉลี่ยจากรายปีแทน")
-
-    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-    rows = []
-    for m in range(1, 13):
-        rows.append({"month": m, "month_name": months[m-1], "target": float(monthly_map.get(m, 0.0))})
-
-    editor_df = pd.DataFrame(rows)
-    edited = st.data_editor(
-        editor_df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "month": st.column_config.NumberColumn("Month", disabled=True),
-            "month_name": st.column_config.TextColumn("Name", disabled=True),
-            "target": st.column_config.NumberColumn("Monthly Target (บาท)", min_value=0.0, step=1000.0),
-        }
-    )
-
-    if st.button("บันทึกเป้ารายเดือน", type="primary", use_container_width=True):
-        for _, r in edited.iterrows():
-            m = int(r["month"])
-            t = float(r["target"] or 0.0)
-            upsert_target(ach_ws, int(year_input), m, t)
-        st.success("บันทึกเป้ารายเดือนแล้ว ✅")
-        st.rerun()
-
-    st.markdown("---")
-    st.markdown("#### ตัวอย่างตามโจทย์")
-    st.write(f"- ถ้าตั้งเป้ารายปี {money(10_000_000)} → ค่าเฉลี่ยต่อเดือน {money(10_000_000/12)}")
-    st.write("- Dashboard จะแสดงยอดเดือนนี้ / เป้ารายเดือน + ยังขาดอีกเท่าไหร่ + % พร้อม progress bar")
+          <div class="card
