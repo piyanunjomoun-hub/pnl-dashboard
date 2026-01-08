@@ -13,7 +13,9 @@ st.set_page_config(
     layout="wide"
 )
 
-DB_PATH = "pnl.sqlite3"
+import os
+os.makedirs("data", exist_ok=True)
+DB_PATH = "data/pnl.sqlite3"
 
 # -------------------------
 # DATABASE
