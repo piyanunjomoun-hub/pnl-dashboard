@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 # -----------------------------
 # Page config
 # -----------------------------
-st.set_page_config(page_title="Production P&L", page_icon="📊", remember=False, layout="wide")
+st.set_page_config(page_title="Production P&L", page_icon="📊", layout="wide")
 
 
 # =========================
